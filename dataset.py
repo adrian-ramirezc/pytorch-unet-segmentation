@@ -6,13 +6,6 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-
-from torch.utils.data import Dataset
-import matplotlib.pyplot as plt
-from pathlib import Path
-import pandas as pd
-import numpy as np
-
 # Dataset Information:
 # All images of 512 x 512
 # X : Tomography - image reconstructed - already normalized (0-1)
@@ -28,12 +21,26 @@ import numpy as np
 #     3: "cyst"
 # }
 
-class myDataset(Dataset):  
+class TomographyDataset(Dataset):  
     
-    def __init__(self, data_dir = './data/', dataset_csv = './data/dataset.csv'):
+    def __init__(self, data_dir = './data/', dataset_csv = './data/dataset.csv', split_set ='train', transform = None):
         super(Dataset, self).__init__()
         self.data_dir = data_dir
         self.dataset_df = pd.read_csv(dataset_csv)
+        self.split_set = split_set
+        self.transform = transform 
+
+        if self.split_set == 'train':
+            self.dataset_df = self.dataset_df[self.dataset_df['split_set'] == 'train']
+
+        elif self.split_set == 'validation':
+            self.dataset_df = self.dataset_df[self.dataset_df['split_set'] == 'validation']
+        
+        elif self.split_set == 'test':
+            self.dataset_df = self.dataset_df[self.dataset_df['split_set'] == 'test']
+        
+        self.dataset_df.reset_index(inplace=True, drop=True)
+
     
     def __getitem__(self, index):
         X_path = self.dataset_df['reconstruction_file'][index]
@@ -47,9 +54,14 @@ class myDataset(Dataset):
         except:
             y_img = np.zeros(shape = (512,512))
 
+        if self.transform is not None:
+            augmentations = self.transform(image = X_img, mask = y_img)
+            X_img = augmentations['image']
+            y_img = augmentations['mask']
+            #print(f'X_img shape: {X_img.shape}')  # 1,H,W
+            #print(f'y_img shape: {y_img.shape}')  # H,W
+         
         y_img4 = self.one_hot_encoding(y_img)
-        y_img4 = np.append(y_img4, y_img.reshape(1,512,512), axis=0)
-
         item = X_img, y_img4
         
         return item
@@ -58,10 +70,11 @@ class myDataset(Dataset):
         return self.dataset_df.shape[0] 
     
     @staticmethod
-    def one_hot_encoding(mask_img, shape = (4,512,512)):
-        ohe = np.zeros(shape = shape)
-        for i in range(shape[1]):
-            for j in range(shape[2]):
+    def one_hot_encoding(mask_img):
+        shape = mask_img.shape # H,W
+        ohe = np.zeros(shape = (4,shape[0],shape[1]))
+        for i in range(shape[0]):
+            for j in range(shape[1]):
                 label = mask_img[i,j]
                 if label == 0:
                     ohe[:,i,j] = [1,0,0,0] # background, kidney, tumor, cyst
@@ -74,16 +87,6 @@ class myDataset(Dataset):
 
         return ohe # 4 channels 
     
-    @staticmethod
-    def show_item(X, y_img4):
-        fig, ax = plt.subplots(ncols=6, figsize=(20,10))
-        ax=ax.reshape(-1)
-        ax[0].imshow(X, cmap='Greys')
-        ax[1].imshow(y_img4[0], cmap='Greys', vmin = 0, vmax = 1) # background
-        ax[2].imshow(y_img4[1], cmap='Greys', vmin = 0, vmax = 1) # kidney
-        ax[3].imshow(y_img4[2], cmap='Greys', vmin = 0, vmax = 1) # tumor
-        ax[4].imshow(y_img4[3], cmap='Greys', vmin = 0, vmax = 1) # cyst
-        ax[5].imshow(y_img4[4]) # mask
 
 if __name__ == '__main__':
     pass

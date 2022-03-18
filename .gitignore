@@ -1,2 +1,5 @@
 /data 
 /saved_data
+__pycache__/
+my_checkpoint.pth.tar
+saved_images/
