@@ -1,3 +1,4 @@
+from tkinter import Y
 import torch 
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -5,6 +6,8 @@ from tqdm import tqdm
 import torch.nn as nn 
 import torch.optim as optim
 from model import UNET
+from torch.nn import BCELoss
+from torch.nn import BCEWithLogitsLoss
 
 import argparse
 
@@ -19,7 +22,7 @@ from utils import (
 
 
 # Run the script like this:
-# python train.py -pm -bs 5 -e 20 -nw 4 -imgh 256 -imgw 256 
+# python train.py -pm -lm -bs 5 -e 20 -nw 4 -imgh 256 -imgw 256 
 
 # Hyperparameters
 parser = argparse.ArgumentParser(   prog='hyperparameter selection', 
@@ -62,15 +65,16 @@ def train_fn(loader, model, optimizer, loss_fn, scaler):
 
         # update tqdm loop
         loop.set_postfix(loss = loss.item())
-     
+
+
 
 def main():
     train_transform = A.Compose(
         [
             A.Resize(height = args.image_height, width = args.image_width),
-            A.Rotate(limit=35, p=1.0),
+            A.Rotate(limit=35, p=0.5),
             A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.1),
+            A.VerticalFlip(p=0.5),
             ToTensorV2()
         ],
     )
@@ -83,8 +87,14 @@ def main():
     )
 
     model = UNET(in_channels =1, out_channels=4).to(args.device)
-    loss_fn = nn.CrossEntropyLoss()
+
+    # loss_fn = nn.CrossEntropyLoss()
+    #loss_fn = BCELoss(reduction='mean')
+    loss_fn = BCEWithLogitsLoss(reduction='mean')
+    
     optimizer = optim.Adam(model.parameters(), lr = args.learning_rate)
+
+    scaler = torch.cuda.amp.GradScaler() # Using FP16, we risk of underflowing -> scale the gradient
 
     train_loader, val_loader = get_loaders(
                             batch_size = args.batch_size,
@@ -95,9 +105,9 @@ def main():
 
     if args.load_model:
         load_checkpoint(torch.load("my_checkpoint.pth.tar"), model)
-        check_accuracy(val_loader, model, device = args.device)
+        check_accuracy(val_loader, model, device = args.device, is_val = True)
+        #check_accuracy(train_loader, model, device = args.device, is_val = False)
 
-    scaler = torch.cuda.amp.GradScaler() # Using FP16, we risk of underflowing -> scale the gradient
 
     for epoch in range(args.epochs):
         train_fn(train_loader, model, optimizer, loss_fn, scaler)
@@ -111,11 +121,14 @@ def main():
 
         if (epoch+1) % 5 == 0:
             # check accuracy
-            check_accuracy(val_loader, model, device = args.device)
+            check_accuracy(val_loader, model, device = args.device, is_val = True)
+            #check_accuracy(train_loader, model, device = args.device, is_val = False)
 
         if epoch == args.epochs - 1:
             # print some examples to a folder 
             save_predictions_as_imgs(val_loader, model, folder='saved_images/', device=args.device)
+            check_accuracy(val_loader, model, device = args.device, is_val = True)
+            check_accuracy(train_loader, model, device = args.device, is_val = False)
 
 
 if __name__ == '__main__':

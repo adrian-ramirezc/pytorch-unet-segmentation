@@ -57,10 +57,11 @@ class TomographyDataset(Dataset):
         if self.transform is not None:
             augmentations = self.transform(image = X_img, mask = y_img)
             X_img = augmentations['image']
-            y_img = augmentations['mask']
+            y_img = augmentations['mask'] #check if labels are still ok
+            
             #print(f'X_img shape: {X_img.shape}')  # 1,H,W
             #print(f'y_img shape: {y_img.shape}')  # H,W
-         
+
         y_img4 = self.one_hot_encoding(y_img)
         item = X_img, y_img4
         
@@ -76,17 +77,17 @@ class TomographyDataset(Dataset):
         for i in range(shape[0]):
             for j in range(shape[1]):
                 label = mask_img[i,j]
-                if label == 0:
+                if label == 0: # background
                     ohe[:,i,j] = [1,0,0,0] # background, kidney, tumor, cyst
-                elif label == 1: 
+                elif label == 1: # kidney
                     ohe[:,i,j] = [0,1,0,0]
-                elif label == 2:
-                    ohe[:,i,j] = [0,1,1,0]
-                elif label == 2:
+                elif label == 3: # 3 = cyst
                     ohe[:,i,j] = [0,1,0,1]
+                elif label == 2: # tumor
+                    ohe[:,i,j] = [0,1,1,1]
 
-        return ohe # 4 channels 
-    
+        return ohe # 4 channels
+
 
 if __name__ == '__main__':
     pass

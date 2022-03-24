@@ -39,7 +39,7 @@ class UNET(nn.Module):
         
         self.bottleneck = DoubleConv(features[-1], features[-1]*2)
         self.final_conv = nn.Conv2d(features[0], out_channels, kernel_size=1)
-        self.sigmoid = nn.Sigmoid() 
+        #self.sigmoid = nn.Sigmoid() 
 
     def forward(self, x): 
         skip_connections = []
@@ -67,7 +67,8 @@ class UNET(nn.Module):
             x = self.ups[idx + 1](concat_skip)
 
         x = self.final_conv(x)
-        return self.sigmoid(x) # element wise sigmoid
+        return x
+        #return self.sigmoid(x) # element wise sigmoid
 
 def test():
     x = torch.randn((1,1,128,128))
